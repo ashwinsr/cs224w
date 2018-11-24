@@ -1,11 +1,17 @@
 import numpy as np
 import networkx as nx
+from networkx.algorithms.community.kernighan_lin import kernighan_lin_bisection
 import matplotlib.pyplot as plt
 
 GRAPH_WEIGHT_MATRIX_FILE = 'cds/WeeklySTD_CDS_Network_GVD_p8_keep2500.csv'
-
 EPSILON = 1e-8
+
+# Edge weight threshold only used for
+# plotting of high weight edges
 EDGE_WEIGHT_THRESHOLD = 0.06
+
+# Mapping from countries to continents
+CONTINENT_MAP = {'Brazil': 'South America', 'Chile': 'South America', 'China': 'Asia', 'Colombia': 'South America', 'Indonesia': 'Asia', 'Malaysia': 'Asia', 'Mexico': 'North America', 'Panama': 'North America', 'Peru': 'South America', 'Philippines': 'Asia', 'Russia': 'Asia', 'South Africa': 'Africa', 'South Korea': 'Asia', 'Thailand': 'Asia', 'Turkey': 'Asia', 'Argentina': 'South America', 'Austria': 'Europe', 'Belgium': 'Europe', 'Bulgaria': 'Europe', 'Croatia': 'Europe', 'France': 'Europe', 'Germany': 'Europe', 'Hungary': 'Europe', 'Italy': 'Europe', 'Poland': 'Europe', 'Portugal': 'Europe', 'Romania': 'Europe', 'Slovakia': 'Europe', 'Spain': 'Europe', 'Venezuela': 'South America'}
 
 def load_country_list():
     with open(GRAPH_WEIGHT_MATRIX_FILE) as f:
@@ -20,22 +26,35 @@ def load_weight_matrix():
     graph = np.loadtxt(GRAPH_WEIGHT_MATRIX_FILE, delimiter=',', skiprows=1)
     return graph/100
 
-# Plot the high weight edges only
-def plot_network(M):
-    M = M * (M > EDGE_WEIGHT_THRESHOLD)
-
-    G = nx.Graph()
+def get_nx_network(M):
+    G = nx.DiGraph()
     for i in range(len(M)):
         for j in range(len(M)):
             if M[i][j] > 0:
-                G.add_edge(countries[i], countries[j], weight=M[i][j])
+                G.add_edge(countries[j], countries[i], weight=M[i][j])
+    return G
+
+def get_undirected_nx_network(M):
+    G = nx.Graph()
+    for i in range(len(M)):
+        for j in range(i, len(M)):
+            if M[i][j] > 0:
+                G.add_edge(countries[j], countries[i], weight=(M[i][j]+M[j][i])/2.0)
+    return G
+
+# Plot the high weight edges only
+def plot_network(M):
+    M = M * (M > EDGE_WEIGHT_THRESHOLD)
+    G = get_nx_network(M)
 
     pos = nx.spring_layout(G)
     nx.draw_networkx_nodes(G, pos=pos)
-    nx.draw_networkx_edges(G, pos=pos)
+    nx.draw_networkx_edges(G, pos=pos, arrows=True)
     nx.draw_networkx_labels(G, pos=pos, font_size=9, font_color='b')
 
     #plt.show()
+
+    return G
 
 def plot_hist(values, title, xlabel, output_filename):
     plt.clf()
@@ -93,12 +112,6 @@ def compute_degree_distributions(M):
     plot_hist(out_degrees, 'Out Degree Distribution', 'Out Degree', 'out_degrees_dist.png')
     plot_bar(countries, out_degrees, 'Country', 'Out Degree', 'Out Degree', 'out_degrees.png')
 
-def validate_row_sum(M):
-    row_sum_deviation = np.sum(M, axis=1) - 1
-
-    if np.max(np.absolute(row_sum_deviation)) >= EPSILON:
-        raise Exception("Row sum of transition matrix is not 1")
-
 def compute_pagerank_eigenvector(M):
     w, v = np.linalg.eig(M)
     pagerank = v[:,np.argmax(w)].T
@@ -116,7 +129,6 @@ def compute_pagerank_power(M):
         delta = np.max(np.absolute(ranks_new - ranks))
         if delta < EPSILON:
             break
-        #print delta
 
         ranks = ranks_new
 
@@ -126,20 +138,57 @@ def compute_pagerank_power(M):
     plot_bar(countries, ranks, 'Country', 'Pagerank Score', 'Pagerank Scores', 'pagerank.png')
     return ranks
 
+def output_weighted_edge_graph(nx_graph):
+    for edge in nx_graph.edges(data=True):
+        print edge[0].replace(' ','-'), edge[1].replace(' ','-'), edge[2]['weight']
+
+def convert_community_to_continent(community):
+    return sorted([CONTINENT_MAP[c] for c in community])
+
+def get_initial_partition(size):
+    # Split the countries array into two partitions,
+    # one of which is of size 'size'
+    return (countries[:size], countries[size:])
+
+def detect_communities(M):
+    # Uses the Kernighan Lin bisection for
+    # community detection
+    nx_graph = get_undirected_nx_network(M)
+
+    # Try out partitions of all sizes
+    for size in range(1, len(M)):
+        partition = get_initial_partition(size)
+        partition = kernighan_lin_bisection(nx_graph, partition=partition, max_iter=100, weight='weight')
+        print "------"
+        print "Size:", size
+        print "Size a:", len(partition[0])
+        print "Size b:", len(partition[1])
+        print sorted(partition[0])
+        print sorted(partition[1])
+        print convert_community_to_continent(partition[0])
+        print convert_community_to_continent(partition[1])
+
+########## BEGIN ANALYSIS ##########
+
 countries = load_country_list()
 M = load_weight_matrix()
-np.fill_diagonal(M, 0.0)
-plot_network(M)
 
+# We don't care about self influence
+np.fill_diagonal(M, 0.0)
+
+# Visualize basic network properties
+plot_network(M)
 heatmap_weights(M)
 compute_degree_distributions(M)
-compute_pagerank_power(M) #is this correct? Is directionality of edges correct?
-#compute_pagerank_eigenvector(M)
 
-# Use network deconvolution to get rid of second and third order relations. Look at lecture 4
+# The highest page rank scores will be nodes that
+# are INFLUENCED a lot
+compute_pagerank_power(M)
+
+# Find some communities
+detect_communities(M)
+
+# Make a random graph null model
 # Compute motif intensity and coherence
-# Node centrality
-# Clustering coefficient
-# The stochastic block model thing
-# Role detection with recursive features (lecture 5)
-# Community detection with Louvain algorithm (lecture 6)
+
+########## END ANALYSIS ##########
