@@ -168,6 +168,30 @@ def detect_communities(M):
         print convert_community_to_continent(partition[0])
         print convert_community_to_continent(partition[1])
 
+def spectral_detect_communities(M):
+    # Use spectral clustering to detect communities
+    w, v = np.linalg.eig(M)
+
+    # Use the second largest eigenvector to detect communities
+    community_split = v[:,1]
+    assert all(np.isreal(community_split))
+    community_split = community_split.real
+
+    community_a = []
+    community_b = []
+    for i in range(len(community_split)):
+        if community_split[i] > 0:
+            community_a.append(countries[i])
+        else:
+            community_b.append(countries[i])
+
+    print "Size a:", len(community_a)
+    print "Size b:", len(community_b)
+    print sorted(community_a)
+    print sorted(community_b)
+    print convert_community_to_continent(community_a)
+    print convert_community_to_continent(community_b)
+
 ########## BEGIN ANALYSIS ##########
 
 countries = load_country_list()
@@ -186,9 +210,12 @@ compute_degree_distributions(M)
 compute_pagerank_power(M)
 
 # Find some communities
-detect_communities(M)
+#detect_communities(M)
+spectral_detect_communities(M)
 
 # Make a random graph null model
 # Compute motif intensity and coherence
+
+# Role extraction
 
 ########## END ANALYSIS ##########
