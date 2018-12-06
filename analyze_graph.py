@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 from networkx.algorithms.community.kernighan_lin import kernighan_lin_bisection
+from networkx.linalg.algebraicconnectivity import fiedler_vector
 import matplotlib.pyplot as plt
 
 GRAPH_WEIGHT_MATRIX_FILE = 'cds/WeeklySTD_CDS_Network_GVD_p8_keep2500_Greece_US_UK.csv'
@@ -130,6 +131,7 @@ def compute_pagerank_power(M):
     # Power iterate
     while True:
         ranks_new = M.dot(ranks)
+        ranks_new = ranks_new / np.linalg.norm(ranks_new)
 
         delta = np.max(np.absolute(ranks_new - ranks))
         if delta < EPSILON:
@@ -172,6 +174,22 @@ def detect_communities(M):
         print sorted(partition[1])
         print convert_community_to_continent(partition[0])
         print convert_community_to_continent(partition[1])
+
+def nx_fiedler_communities(M):
+    nx_graph = get_undirected_nx_network(M)
+
+    # Remove detected communities
+    community_1 = ['Argentina', 'Venezuela']
+    community_2 = ['Italy', 'France', 'Belgium', 'Germany', 'Spain', 'United States', 'Portugal', 'United Kingdom', 'Greece']
+    for node in community_1 + community_2:
+        nx_graph.remove_node(node)
+
+    nodes = np.array(nx_graph.nodes())
+    vector = fiedler_vector(nx_graph, weight='weight')
+
+    print "-----"
+    print nodes[vector >= 0]
+    print nodes[vector < 0]
 
 def spectral_detect_communities(M):
     # Use spectral clustering to detect communities
@@ -219,7 +237,8 @@ ranks = compute_pagerank_power(M.T)
 
 # Find some communities
 #detect_communities(M)
-# spectral_detect_communities(M)
+spectral_detect_communities(M)
+nx_fiedler_communities(M)
 
 # Stochastic block model it
 # block_and_heatmap(M, ranks)
