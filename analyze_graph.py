@@ -3,15 +3,15 @@ import networkx as nx
 from networkx.algorithms.community.kernighan_lin import kernighan_lin_bisection
 import matplotlib.pyplot as plt
 
-GRAPH_WEIGHT_MATRIX_FILE = 'cds/WeeklySTD_CDS_Network_GVD_p8_keep2500.csv'
+GRAPH_WEIGHT_MATRIX_FILE = 'cds/WeeklySTD_CDS_Network_GVD_p8_keep2500_Greece_US_UK.csv'
 EPSILON = 1e-8
 
 # Edge weight threshold only used for
 # plotting of high weight edges
-EDGE_WEIGHT_THRESHOLD = 0.06
+EDGE_WEIGHT_THRESHOLD = 0.08
 
 # Mapping from countries to continents
-CONTINENT_MAP = {'Brazil': 'South America', 'Chile': 'South America', 'China': 'Asia', 'Colombia': 'South America', 'Indonesia': 'Asia', 'Malaysia': 'Asia', 'Mexico': 'North America', 'Panama': 'North America', 'Peru': 'South America', 'Philippines': 'Asia', 'Russia': 'Asia', 'South Africa': 'Africa', 'South Korea': 'Asia', 'Thailand': 'Asia', 'Turkey': 'Asia', 'Argentina': 'South America', 'Austria': 'Europe', 'Belgium': 'Europe', 'Bulgaria': 'Europe', 'Croatia': 'Europe', 'France': 'Europe', 'Germany': 'Europe', 'Hungary': 'Europe', 'Italy': 'Europe', 'Poland': 'Europe', 'Portugal': 'Europe', 'Romania': 'Europe', 'Slovakia': 'Europe', 'Spain': 'Europe', 'Venezuela': 'South America'}
+CONTINENT_MAP = {'Brazil': 'South America', 'Chile': 'South America', 'China': 'Asia', 'Colombia': 'South America', 'Indonesia': 'Asia', 'Malaysia': 'Asia', 'Mexico': 'North America', 'Panama': 'North America', 'Peru': 'South America', 'Philippines': 'Asia', 'Russia': 'Asia', 'South Africa': 'Africa', 'South Korea': 'Asia', 'Thailand': 'Asia', 'Turkey': 'Asia', 'Argentina': 'South America', 'Austria': 'Europe', 'Belgium': 'Europe', 'Bulgaria': 'Europe', 'Croatia': 'Europe', 'France': 'Europe', 'Germany': 'Europe', 'Hungary': 'Europe', 'Italy': 'Europe', 'Poland': 'Europe', 'Portugal': 'Europe', 'Romania': 'Europe', 'Slovakia': 'Europe', 'Spain': 'Europe', 'Venezuela': 'South America', 'Greece': 'Europe', 'United States': 'North America', 'United Kingdom': 'Europe'}
 
 def load_country_list():
     with open(GRAPH_WEIGHT_MATRIX_FILE) as f:
@@ -84,7 +84,12 @@ def plot_bar(x, y, xlabel, ylabel, title, output_filename):
 
     plt.savefig('figures/' + output_filename, format='png')
 
-def heatmap_weights(M):
+def block_and_heatmap(M, ranks):
+    # Reorder M
+    order = [i for _, i in sorted([(v,i) for i,v in enumerate(ranks)])]
+    M = M[order]
+    M = M[:, order]
+
     plt.clf()
     plt.imshow(M, cmap='hot')
 
@@ -192,6 +197,8 @@ def spectral_detect_communities(M):
     print convert_community_to_continent(community_a)
     print convert_community_to_continent(community_b)
 
+    return community_split
+
 ########## BEGIN ANALYSIS ##########
 
 countries = load_country_list()
@@ -202,16 +209,20 @@ np.fill_diagonal(M, 0.0)
 
 # Visualize basic network properties
 plot_network(M)
-heatmap_weights(M)
 compute_degree_distributions(M)
 
 # The highest page rank scores will be nodes that
 # are INFLUENCED a lot
-compute_pagerank_power(M)
+#print countries
+ranks = compute_pagerank_power(M.T)
+#print ranks.T.tolist()[0]
 
 # Find some communities
 #detect_communities(M)
-spectral_detect_communities(M)
+# spectral_detect_communities(M)
+
+# Stochastic block model it
+# block_and_heatmap(M, ranks)
 
 # Make a random graph null model
 # Compute motif intensity and coherence
